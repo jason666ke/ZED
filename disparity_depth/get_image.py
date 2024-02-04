@@ -1,5 +1,6 @@
 import os
 import threading
+from time import sleep
 
 import numpy as np
 import pyzed.sl as sl
@@ -12,6 +13,7 @@ if not os.path.exists(save_folder):
 
 # 定义全局变量用以判断相机状态
 camera_status = False
+exit_program = False
 
 """
     SGBM算法参数设置
@@ -54,22 +56,22 @@ def compute_disparity(left, right):
     return disp_normalize
 
 
-# # 深度图
-# def compute_depth(disparity_map):
-#     # 摄像机参数
-#     baseline = 0.5  # 基线距离
-#     # return baseline in unit defined in sl.InitParameters.coordinate_units
-#     focal_length = sl.CalibrationParameters.get_camera_baseline()
-#
-#     # 根据视差图计算深度图
-#     depth_map = (focal_length * baseline) / disparity_map
-#
-#     return depth_map
+# 深度图
+def compute_depth(disparity_map):
+    # 基线距离
+    # return baseline in unit defined in sl.InitParameters.coordinate_units
+    baseline = sl.CalibrationParameters.get_camera_baseline()
+    # 焦距
+    focal_length = sl.CameraParameters.fx
+    # 根据视差图计算深度图
+    depth_map = (focal_length * baseline) / disparity_map
+
+    return depth_map
 
 
 # 图像处理线程
 def image_processing_thread():
-    global camera_status
+    global camera_status, exit_program
 
     zed = sl.Camera()
     init = sl.InitParameters()
@@ -110,6 +112,8 @@ def image_processing_thread():
 
             key = cv2.waitKey(10)
             if key == ord('q') or key == ord('Q'):
+                exit_program = True
+                print("Exit camera thread: ", exit_program)
                 break
 
     zed.close()
@@ -118,17 +122,27 @@ def image_processing_thread():
 # 主程序
 if __name__ == "__main__":
     camera_thread = threading.Thread(target=image_processing_thread)
+    print("Camera thread start...")
     camera_thread.start()
 
+    # while True:
+    #     # 检测键盘输入
+    #     key = cv2.waitKey(10)
+    #     if key == ord('q') or key == ord('Q'):
+    #         exit_program = True
+    #     if exit_program:
+    #         break
     while True:
-        # 检测键盘输入
-        key = cv2.waitKey(10)
-        if key == ord('q') or key == ord('Q'):
+        if exit_program:
             break
+        print("Running main thread for 5s...")
+        sleep(5)
+        pass
 
+    print("Exit main thread: ", exit_program)
     # 关闭相机和窗口
     camera_status = False
     camera_thread.join()
-    cv2.destroyAllWindows()
+    print("Camera thread end.")
 
     exit(0)
