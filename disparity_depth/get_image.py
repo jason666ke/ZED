@@ -57,14 +57,13 @@ def compute_disparity(left, right):
 
 
 # 深度图
-def compute_depth(disparity_map):
+def compute_depth(disparity_map, baseline, fx):
     # 基线距离
     # return baseline in unit defined in sl.InitParameters.coordinate_units
-    baseline = sl.CalibrationParameters.get_camera_baseline()
+    # baseline = sl.CalibrationParameters.get_camera_baseline()
     # 焦距
-    focal_length = sl.CameraParameters.fx
-    # 根据视差图计算深度图
-    depth_map = (focal_length * baseline) / disparity_map
+    # focal_length = sl.CameraParameters.fx
+    depth_map = (fx * baseline) / disparity_map
 
     return depth_map
 
@@ -92,6 +91,16 @@ def image_processing_thread():
     left = sl.Mat()
     right = sl.Mat()
 
+    # info = zed.get_camera_information()
+    # if info.camera_model != sl.MODEL.ZED2:
+    #     print("This code is designed to work with ZED2 cameras only")
+    #     exit(1)
+    unit = init.coordinate_units
+    calibration_params = zed.get_camera_information().camera_configuration.calibration_parameters
+    focal_left_x = calibration_params.left_cam.fx
+    baseline = calibration_params.get_camera_baseline()
+    print("Baseline, fx: {0}, {1} {2}".format(baseline, focal_left_x, unit))
+
     while camera_status:
         if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
             # 获取左,右图像
@@ -104,11 +113,15 @@ def image_processing_thread():
             # 执行视差计算
             disp = compute_disparity(left_data, right_data)
 
+            # 执行深度计算
+            depth = compute_depth(disp, baseline, focal_left_x)
+
             # 可视化
             if disp is not None:
-                cv2.imshow("left", left_data)
-                cv2.imshow("right", right_data)
+                # cv2.imshow("left", left_data)
+                # cv2.imshow("right", right_data)
                 cv2.imshow("disparity", disp)
+                cv2.imshow("depth", depth)
 
             key = cv2.waitKey(10)
             if key == ord('q') or key == ord('Q'):
@@ -135,7 +148,7 @@ if __name__ == "__main__":
     while True:
         if exit_program:
             break
-        print("Running main thread for 5s...")
+        # print("Running main thread for 5s...")
         sleep(5)
         pass
 
