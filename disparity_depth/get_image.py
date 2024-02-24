@@ -1,10 +1,12 @@
 import os
 import threading
+import time
 from time import sleep
 
 import numpy as np
 import pyzed.sl as sl
 import cv2
+import open3d as o3d
 
 # 创建保存图像的文件夹
 save_folder = "image"
@@ -58,14 +60,83 @@ def compute_disparity(left, right):
 
 # 深度图
 def compute_depth(disparity_map, baseline, fx):
-    # 基线距离
-    # return baseline in unit defined in sl.InitParameters.coordinate_units
-    # baseline = sl.CalibrationParameters.get_camera_baseline()
-    # 焦距
-    # focal_length = sl.CameraParameters.fx
+    """
+    Compute depth map from disparity map
+    :param disparity_map:
+    :param baseline: baseline of camera (unit: mm)
+    :param fx: focal length of camera
+    :return: depth map
+    """
+    # Depth = 焦距 * 基线距离 / 视差
     depth_map = (fx * baseline) / disparity_map
 
     return depth_map
+
+
+def depth2pcd(depth_map, camera_intrinsics, flatten=False):
+    fx, fy, cx, cy = camera_intrinsics
+    height, width = np.mgrid[0:depth_map.shape[0], 0:depth_map.shape[1]]
+
+    z = depth_map
+    x = (width - cx) * z / fx
+    y = (width - cy) * z / fy
+
+    xyz = np.dstack((x, y, z)) if flatten is False else np.dstack((x, y, z)).reshape(-1, 3)
+    return xyz
+
+
+def length_to_pixels(length_mm, sensor_width_mm, image_width):
+    """
+    Convert length from millimeters to pixels.
+
+    Parameters:
+    :param length_mm: Length in millimeters.
+    :param sensor_width_mm: Sensor width in millimeters.
+    :param image_width: Image width in pixels
+
+    Returns:
+    :return pixels: Length in pixels
+    """
+    pixels = length_mm / (sensor_width_mm / image_width)
+    return pixels
+
+
+def write_ply(point_cloud, save_ply):
+    start = time.time()
+    float_formatter = lambda x: "%.4f" % x
+    points = []
+
+    for i in point_cloud.T:
+        points.append("{} {} {} {} {} {} o\n".format(
+            float_formatter(i[0]), float_formatter(i[1]), float_formatter(i[2]),
+            int(i[3]), int(i[4]), int(i[5])
+        ))
+
+    file = open(save_ply, "w")
+    file.write(
+        '''ply
+        format ascii 1.0
+        element vertex %d
+        property float x
+        property float y
+        property float z
+        property uchar red
+        property uchar green
+        property uchar blue
+        property uchar alpha
+        end_header
+        %s
+        ''' % (len(points), "".join(points))
+    )
+    file.close()
+
+    end = time.time()
+    print("Write into .ply file Done", end - start)
+
+
+def show_point_cloud(point_cloud):
+    pcd = o3d.io.read_point_cloud(point_cloud)
+    o3d.visualization.draw([point_cloud])
 
 
 # 图像处理线程
@@ -91,15 +162,22 @@ def image_processing_thread():
     left = sl.Mat()
     right = sl.Mat()
 
-    # info = zed.get_camera_information()
-    # if info.camera_model != sl.MODEL.ZED2:
-    #     print("This code is designed to work with ZED2 cameras only")
-    #     exit(1)
-    unit = init.coordinate_units
-    calibration_params = zed.get_camera_information().camera_configuration.calibration_parameters
-    focal_left_x = calibration_params.left_cam.fx
-    baseline = calibration_params.get_camera_baseline()
-    print("Baseline, fx: {0}, {1} {2}".format(baseline, focal_left_x, unit))
+    # 获取摄像头的标定参数
+    camera_info = zed.get_camera_information()
+    calibration_params = camera_info.camera_configuration.calibration_parameters
+    # sensor_width_pixel = calibration_params.left_cam.image_size.width  # 左摄像头获取图像的像素宽度
+    # sensor_height_pixel = calibration_params.left_cam.image_size.height  # 左摄像头获取图像的像素高度
+    # focal_left_x = calibration_params.left_cam.fx  # 焦距（像素单位）
+    focal_left_metric = calibration_params.left_cam.focal_length_metric  # real focal length in millimeters
+    print("Left cam fx: {0} millimeters".format(focal_left_metric))
+    baseline_mm = calibration_params.get_camera_baseline()  # 基线距离(毫米为单位)
+    # baseline_pixel = (baseline_mm * focal_left_x) / focal_left_metric  # 基线距离（像素为单位）
+    print("Baseline: {0} millimeters".format(baseline_mm))
+    fx = calibration_params.left_cam.fx
+    fy = calibration_params.left_cam.fy
+    cx = calibration_params.left_cam.cx
+    cy = calibration_params.left_cam.cy
+    camera_intrinsics = [fx, fy, cx, cy]
 
     while camera_status:
         if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
@@ -114,7 +192,10 @@ def image_processing_thread():
             disp = compute_disparity(left_data, right_data)
 
             # 执行深度计算
-            depth = compute_depth(disp, baseline, focal_left_x)
+            depth = compute_depth(disp, baseline_mm, focal_left_metric)
+
+            # 点云计算
+            pcd = depth2pcd(depth, camera_intrinsics)
 
             # 可视化
             if disp is not None:
@@ -122,6 +203,9 @@ def image_processing_thread():
                 # cv2.imshow("right", right_data)
                 cv2.imshow("disparity", disp)
                 cv2.imshow("depth", depth)
+                # disp_and_depth = np.hstack([disp, depth])
+                # cv2.imshow("disparity and depth", disp_and_depth)
+                # show_point_cloud(pcd)
 
             key = cv2.waitKey(10)
             if key == ord('q') or key == ord('Q'):
