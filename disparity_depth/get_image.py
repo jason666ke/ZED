@@ -74,15 +74,37 @@ def compute_depth(disparity_map, baseline, fx):
 
 
 def depth2pcd(depth_map, camera_intrinsics, flatten=False):
+    # todo: 加入上色代码
     fx, fy, cx, cy = camera_intrinsics
     height, width = np.mgrid[0:depth_map.shape[0], 0:depth_map.shape[1]]
 
     z = depth_map
     x = (width - cx) * z / fx
-    y = (width - cy) * z / fy
+    y = (height - cy) * z / fy
 
     xyz = np.dstack((x, y, z)) if flatten is False else np.dstack((x, y, z)).reshape(-1, 3)
+
     return xyz
+
+
+def depth2pcd_with_o3d(depth_map, intrinsic):
+    depth_image = o3d.t.geometry.Image(depth_map)
+    fx, fy, cx, cy = intrinsic
+    intrinsic_matrix = o3d.core.Tensor([
+        [fx, 0, cx],
+        [0, fy, cy],
+        [0, 0, 1]
+    ])
+    pcd = o3d.t.geometry.PointCloud.create_from_depth_image(depth=depth_image,
+                                                            intrinsics=intrinsic_matrix)
+    # o3d.visualization.draw([pcd])
+    return pcd
+
+
+def visualize_pcd(point_cloud):
+    # pcd = o3d.io.read_point_cloud(point_cloud)
+    o3d.visualization.draw([point_cloud])
+    # o3d.visualization.draw_geometries([point_cloud])
 
 
 def length_to_pixels(length_mm, sensor_width_mm, image_width):
@@ -134,11 +156,6 @@ def write_ply(point_cloud, save_ply):
     print("Write into .ply file Done", end - start)
 
 
-def show_point_cloud(point_cloud):
-    pcd = o3d.io.read_point_cloud(point_cloud)
-    o3d.visualization.draw([point_cloud])
-
-
 # 图像处理线程
 def image_processing_thread():
     global camera_status, exit_program
@@ -146,7 +163,8 @@ def image_processing_thread():
     zed = sl.Camera()
     init = sl.InitParameters()
     init.depth_mode = sl.DEPTH_MODE.ULTRA
-    init.camera_resolution = sl.RESOLUTION.HD720
+    # init.camera_resolution = sl.RESOLUTION.HD720
+    init.camera_resolution = sl.RESOLUTION.VGA
 
     status = zed.open(init)
     if status != sl.ERROR_CODE.SUCCESS:
@@ -165,13 +183,9 @@ def image_processing_thread():
     # 获取摄像头的标定参数
     camera_info = zed.get_camera_information()
     calibration_params = camera_info.camera_configuration.calibration_parameters
-    # sensor_width_pixel = calibration_params.left_cam.image_size.width  # 左摄像头获取图像的像素宽度
-    # sensor_height_pixel = calibration_params.left_cam.image_size.height  # 左摄像头获取图像的像素高度
-    # focal_left_x = calibration_params.left_cam.fx  # 焦距（像素单位）
-    focal_left_metric = calibration_params.left_cam.focal_length_metric  # real focal length in millimeters
-    print("Left cam fx: {0} millimeters".format(focal_left_metric))
+    focal_left_x = calibration_params.left_cam.fx  # 焦距（像素单位）
+    print("Left cam fx: {0} pixel".format(focal_left_x))
     baseline_mm = calibration_params.get_camera_baseline()  # 基线距离(毫米为单位)
-    # baseline_pixel = (baseline_mm * focal_left_x) / focal_left_metric  # 基线距离（像素为单位）
     print("Baseline: {0} millimeters".format(baseline_mm))
     fx = calibration_params.left_cam.fx
     fy = calibration_params.left_cam.fy
@@ -192,17 +206,26 @@ def image_processing_thread():
             disp = compute_disparity(left_data, right_data)
 
             # 执行深度计算
-            depth = compute_depth(disp, baseline_mm, focal_left_metric)
+            depth = compute_depth(disp, baseline_mm, focal_left_x)
 
             # 点云计算
-            pcd = depth2pcd(depth, camera_intrinsics)
+            # todo: 点云计算无法做到实时可视化
+            # pcd = depth2pcd(depth, camera_intrinsics)
+            # pcd = depth2pcd_with_o3d(depth, camera_intrinsics)
+            # visualize_pcd(pcd)
+            # depth2pcd_with_o3d(depth, camera_intrinsics)
 
             # 可视化
             if disp is not None:
                 # cv2.imshow("left", left_data)
                 # cv2.imshow("right", right_data)
-                cv2.imshow("disparity", disp)
-                cv2.imshow("depth", depth)
+                both_view = np.hstack([left_data, right_data])
+                cv2.imshow("Left and Right", both_view)
+                disp_and_depth = np.hstack([disp, depth])
+                # all_combine = np.vstack([both_view, disp_and_depth])
+                # cv2.imshow("disparity", disp)
+                # cv2.imshow("depth", depth)
+                cv2.imshow("Disp and Depth", disp_and_depth)
                 # disp_and_depth = np.hstack([disp, depth])
                 # cv2.imshow("disparity and depth", disp_and_depth)
                 # show_point_cloud(pcd)
