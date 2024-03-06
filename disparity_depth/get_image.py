@@ -17,33 +17,20 @@ if not os.path.exists(save_folder):
 camera_status = False
 exit_program = False
 
-"""
-    SGBM算法参数设置
-"""
-window_size = 5
-min_disp = 16  # 最小视差值
-num_disp = 192 - min_disp  # 视差范围
-blockSize = window_size  # 每个像素周围的块大小
-uniquenessRatio = 1  # 唯一性比率，判断是否存在唯一的匹配，值越小，唯一性匹配的要求越高
-speckleRange = 3  # 斑点范围
-speckleWindowSize = 3  # 斑点窗口大小
-disp12MaxDiff = 200  # 最大视差差
-P1 = 600  # 控制低纹理区域的平滑程度
-P2 = 2400  # 控制高纹理区域的平滑程度
-
 
 # 使用双目摄像头进行视差计算
-def compute_disparity(left, right):
-    global camera_status
-    if not camera_status:
-        print("Camera status wrong!")
-        return None
+def compute_disparity(left, right, min_disp, num_disp, block_size, uniquenessRatio, speckleRange, speckleWindowSize,
+                      disp12MaxDiff, P1, P2):
+    # global camera_status
+    # if not camera_status:
+    #     print("Camera status wrong!")
+    #     return None
 
     # 创建一个StereoSGBM实例
     stereo = cv2.StereoSGBM.create(
         minDisparity=min_disp,
         numDisparities=num_disp,
-        blockSize=window_size,
+        blockSize=block_size,
         uniquenessRatio=uniquenessRatio,
         speckleRange=speckleRange,
         speckleWindowSize=speckleWindowSize,
@@ -54,8 +41,13 @@ def compute_disparity(left, right):
 
     # 将整数的视差值转化为浮点数，便于更好的表示
     disp = stereo.compute(left, right).astype(np.float32) / 16.0
-    disp_normalize = (disp - min_disp) / num_disp
-    return disp_normalize
+
+    # 视差图归一化到 [0, 1]的范围内
+    # disp = (disp - min_disp) / num_disp
+
+    disp = np.clip((disp - min_disp) / num_disp, 0, 1)
+
+    return disp
 
 
 # 深度图
@@ -97,7 +89,7 @@ def depth2pcd_with_o3d(depth_map, intrinsic):
     ])
     pcd = o3d.t.geometry.PointCloud.create_from_depth_image(depth=depth_image,
                                                             intrinsics=intrinsic_matrix)
-    # o3d.visualization.draw([pcd])
+    o3d.visualization.draw([pcd])
     return pcd
 
 
@@ -157,7 +149,8 @@ def write_ply(point_cloud, save_ply):
 
 
 # 图像处理线程
-def image_processing_thread():
+def image_processing_thread(min_disp, num_disp, block_size, uniquenessRatio, speckleRange, speckleWindowSize,
+                            disp12MaxDiff, P1, P2):
     global camera_status, exit_program
 
     zed = sl.Camera()
@@ -203,7 +196,7 @@ def image_processing_thread():
             right_data = right.get_data()
 
             # 执行视差计算
-            disp = compute_disparity(left_data, right_data)
+            disp = compute_disparity(left_data, right_data, min_disp, num_disp, block_size, uniquenessRatio, speckleRange, speckleWindowSize, disp12MaxDiff, P1, P2)
 
             # 执行深度计算
             depth = compute_depth(disp, baseline_mm, focal_left_x)
@@ -241,7 +234,23 @@ def image_processing_thread():
 
 # 主程序
 if __name__ == "__main__":
-    camera_thread = threading.Thread(target=image_processing_thread)
+    # parameters for StereoSGBM
+
+    min_disp = 16  # 最小视差值
+    num_disp = 192 - min_disp  # 视差范围
+    window_size = 5
+    blockSize = window_size  # 每个像素周围的块大小
+    uniquenessRatio = 1  # 唯一性比率，判断是否存在唯一的匹配，值越小，唯一性匹配的要求越高
+    speckleRange = 3  # 斑点范围
+    speckleWindowSize = 3  # 斑点窗口大小
+    disp12MaxDiff = 200  # 最大视差差
+    P1 = 600  # 控制低纹理区域的平滑程度
+    P2 = 2400  # 控制高纹理区域的平滑程度
+
+    # camera start
+    camera_thread = threading.Thread(target=image_processing_thread, args=(
+        min_disp, num_disp, blockSize, uniquenessRatio, speckleRange, speckleWindowSize, disp12MaxDiff, P1, P2
+    ))
     print("Camera thread start...")
     camera_thread.start()
 
