@@ -7,6 +7,7 @@ import numpy as np
 import pyzed.sl as sl
 import cv2
 import open3d as o3d
+from real_time_pcd import update_point_cloud
 
 # 创建保存图像的文件夹
 save_folder = "image"
@@ -19,13 +20,9 @@ exit_program = False
 
 
 # 使用双目摄像头进行视差计算
-def compute_disparity(left, right, min_disp, num_disp, block_size, uniquenessRatio, speckleRange, speckleWindowSize,
+def compute_disparity(left, right, min_disp, num_disp, block_size,
+                      uniquenessRatio, speckleRange, speckleWindowSize,
                       disp12MaxDiff, P1, P2):
-    # global camera_status
-    # if not camera_status:
-    #     print("Camera status wrong!")
-    #     return None
-
     # 创建一个StereoSGBM实例
     stereo = cv2.StereoSGBM.create(
         minDisparity=min_disp,
@@ -41,10 +38,7 @@ def compute_disparity(left, right, min_disp, num_disp, block_size, uniquenessRat
 
     # 将整数的视差值转化为浮点数，便于更好的表示
     disp = stereo.compute(left, right).astype(np.float32) / 16.0
-
     # 视差图归一化到 [0, 1]的范围内
-    # disp = (disp - min_disp) / num_disp
-
     disp = np.clip((disp - min_disp) / num_disp, 0, 1)
 
     return disp
@@ -80,16 +74,9 @@ def depth2pcd(depth_map, camera_intrinsics, flatten=False):
 
 
 def depth2pcd_with_o3d(depth_map, intrinsic):
-    depth_image = o3d.t.geometry.Image(depth_map)
-    fx, fy, cx, cy = intrinsic
-    intrinsic_matrix = o3d.core.Tensor([
-        [fx, 0, cx],
-        [0, fy, cy],
-        [0, 0, 1]
-    ])
-    pcd = o3d.t.geometry.PointCloud.create_from_depth_image(depth=depth_image,
-                                                            intrinsics=intrinsic_matrix)
-    o3d.visualization.draw([pcd])
+    depth_image = o3d.geometry.Image(depth_map)
+    # print(depth_image.type, intrinsic.type)
+    pcd = o3d.geometry.PointCloud.create_from_depth_image(depth=depth_image, intrinsic=intrinsic)
     return pcd
 
 
@@ -176,15 +163,26 @@ def image_processing_thread(min_disp, num_disp, block_size, uniquenessRatio, spe
     # 获取摄像头的标定参数
     camera_info = zed.get_camera_information()
     calibration_params = camera_info.camera_configuration.calibration_parameters
+
+    # 焦距和基线距离
     focal_left_x = calibration_params.left_cam.fx  # 焦距（像素单位）
-    print("Left cam fx: {0} pixel".format(focal_left_x))
     baseline_mm = calibration_params.get_camera_baseline()  # 基线距离(毫米为单位)
+    print("Left cam fx: {0} pixel".format(focal_left_x))
     print("Baseline: {0} millimeters".format(baseline_mm))
+
+    # 摄像头内参
+    width = calibration_params.left_cam.image_size.width
+    height = calibration_params.left_cam.image_size.height
     fx = calibration_params.left_cam.fx
     fy = calibration_params.left_cam.fy
     cx = calibration_params.left_cam.cx
     cy = calibration_params.left_cam.cy
-    camera_intrinsics = [fx, fy, cx, cy]
+    camera_intrinsics = o3d.camera.PinholeCameraIntrinsic(width, height, fx, fy, cx, cy)
+
+    # 点云对象和可视化窗口
+    pcd = o3d.geometry.PointCloud()
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
 
     while camera_status:
         if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
@@ -196,32 +194,25 @@ def image_processing_thread(min_disp, num_disp, block_size, uniquenessRatio, spe
             right_data = right.get_data()
 
             # 执行视差计算
-            disp = compute_disparity(left_data, right_data, min_disp, num_disp, block_size, uniquenessRatio, speckleRange, speckleWindowSize, disp12MaxDiff, P1, P2)
+            disp = compute_disparity(left_data, right_data, min_disp, num_disp, block_size, uniquenessRatio,
+                                     speckleRange, speckleWindowSize, disp12MaxDiff, P1, P2)
 
-            # 执行深度计算
-            depth = compute_depth(disp, baseline_mm, focal_left_x)
-
-            # 点云计算
-            # todo: 点云计算无法做到实时可视化
-            # pcd = depth2pcd(depth, camera_intrinsics)
-            # pcd = depth2pcd_with_o3d(depth, camera_intrinsics)
-            # visualize_pcd(pcd)
-            # depth2pcd_with_o3d(depth, camera_intrinsics)
-
-            # 可视化
+            # 计算深度、点云并可视化
             if disp is not None:
-                # cv2.imshow("left", left_data)
-                # cv2.imshow("right", right_data)
+                # 执行深度计算
+                depth = compute_depth(disp, baseline_mm, focal_left_x)
+
+                # 点云计算
+                new_pcd = depth2pcd_with_o3d(depth, camera_intrinsics)
+                new_points = np.asarray(new_pcd.points)
+
+                update_point_cloud(pcd, vis, new_points)
+
+                # 可视化
                 both_view = np.hstack([left_data, right_data])
                 cv2.imshow("Left and Right", both_view)
                 disp_and_depth = np.hstack([disp, depth])
-                # all_combine = np.vstack([both_view, disp_and_depth])
-                # cv2.imshow("disparity", disp)
-                # cv2.imshow("depth", depth)
                 cv2.imshow("Disp and Depth", disp_and_depth)
-                # disp_and_depth = np.hstack([disp, depth])
-                # cv2.imshow("disparity and depth", disp_and_depth)
-                # show_point_cloud(pcd)
 
             key = cv2.waitKey(10)
             if key == ord('q') or key == ord('Q'):
