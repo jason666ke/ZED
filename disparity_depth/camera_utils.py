@@ -27,3 +27,10 @@ def get_camera_intrinsics(camera):
 
     return camera_intrinsics, focal_left_x, baseline_mm
 
+
+def get_image_size(camera):
+    camera_info = camera.get_camera_information()
+    calibration_params = camera_info.camera_configuration.calibration_parameters
+    size = calibration_params.left_cam.image_size
+
+    return size

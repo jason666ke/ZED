@@ -5,20 +5,27 @@ import numpy as np
 import open3d as o3d
 
 
-def compute_disparity(left, right, min_disp, num_disp, block_size,
-                      uniquenessRatio, speckleRange, speckleWindowSize,
-                      disp12MaxDiff, P1, P2, mode):
+def compute_disparity(left, right,
+                      min_disp, num_disp,
+                      block_size,
+                      P1, P2,
+                      disp12MaxDiff,
+                      preFilterCap,
+                      uniquenessRatio,
+                      speckleWindowSize, speckleRange,
+                      mode):
     # 创建一个StereoSGBM实例
     stereo = cv2.StereoSGBM.create(
         minDisparity=min_disp,
         numDisparities=num_disp,
         blockSize=block_size,
-        uniquenessRatio=uniquenessRatio,
-        speckleRange=speckleRange,
-        speckleWindowSize=speckleWindowSize,
-        disp12MaxDiff=disp12MaxDiff,
         P1=P1,
         P2=P2,
+        disp12MaxDiff=disp12MaxDiff,
+        preFilterCap=preFilterCap,
+        uniquenessRatio=uniquenessRatio,
+        speckleWindowSize=speckleWindowSize,
+        speckleRange=speckleRange,
         mode=mode
     )
 
@@ -50,18 +57,27 @@ def compute_depth(disparity_map, baseline, fx):
     return depth_map
 
 
-def depth2pcd(depth_map, camera_intrinsics, flatten=False):
+def depth2pcd(depth_map, camera_intrinsics):
     # todo: 加入上色代码
-    fx, fy, cx, cy = camera_intrinsics
-    height, width = np.mgrid[0:depth_map.shape[0], 0:depth_map.shape[1]]
+    width = camera_intrinsics.width
+    height = camera_intrinsics.height
+    intrinsic_matrix = camera_intrinsics.intrinsic_matrix
+    fx = intrinsic_matrix[0][0]
+    fy = intrinsic_matrix[1][1]
+    cx = intrinsic_matrix[0][2]
+    cy = intrinsic_matrix[1][2]
+    # width, height, fx, fy, cx, cy = camera_intrinsics
+    # Generate pixel grid
+    u, v = np.meshgrid(np.arange(width), np.arange(height))
 
+    # compute x, y, z coordinates
+    x = (u - cx) * depth_map / fx
+    y = (v - cy) * depth_map / fy
     z = depth_map
-    x = (width - cx) * z / fx
-    y = (height - cy) * z / fy
 
-    xyz = np.dstack((x, y, z)) if flatten is False else np.dstack((x, y, z)).reshape(-1, 3)
+    pcd = np.dstack((x, y, z))
 
-    return xyz
+    return pcd
 
 
 def depth2pcd_with_o3d(depth_map, intrinsic):

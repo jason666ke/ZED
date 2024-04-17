@@ -3,7 +3,7 @@ import pyzed.sl as sl
 import cv2
 from camera_utils import get_camera_intrinsics
 import compute_utils
-from real_time_pcd import update_point_cloud
+from pcd_utils import update_point_cloud
 import open3d as o3d
 
 left = cv2.imread('image/teddy-png-2/teddy/im2.png')
@@ -61,11 +61,13 @@ status = zed.open(init)
 camera_intrinsics, focal_left_x, baseline_mm = get_camera_intrinsics(zed)
 
 # 计算深度
-depth = np.zeros_like(disp)
-for row in range(disp.shape[0]):
-    for col in range(disp.shape[1]):
-        if disp[row, col] != 0:
-            depth[row, col] = (focal_left_x * baseline_mm) / disp[row, col]
+# depth = np.zeros_like(disp)
+# for row in range(disp.shape[0]):
+#     for col in range(disp.shape[1]):
+#         if disp[row, col] != 0:
+#             depth[row, col] = (focal_left_x * baseline_mm) / disp[row, col]
+depth = compute_utils.compute_depth(disp, baseline_mm, focal_left_x)
+cv2.imwrite('image/teddy-png-2/teddy/teddy_depth.png', depth)
 
 print("Minimum and maximum depth is: ", np.min(depth), np.max(depth))
 
@@ -81,6 +83,8 @@ new_points = np.asarray(new_pcd.points)
 pcd = o3d.geometry.PointCloud()
 vis = o3d.visualization.Visualizer()
 vis.create_window()
+vis.add_geometry(new_pcd)
+
 update_point_cloud(pcd, vis, new_points)
 
 print("Point Cloud contains: ", len(pcd.points))
@@ -88,5 +92,4 @@ print("Point Cloud contains: ", len(pcd.points))
 cv2.waitKey()
 cv2.destroyAllWindows()
 
-
-o3d.io.write_point_cloud("../result/teddy.pcd", pcd)
+o3d.io.write_point_cloud("../result/pcd/teddy.pcd", pcd)
