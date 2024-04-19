@@ -1,4 +1,15 @@
 import open3d as o3d
+import pyzed.sl as sl
+
+
+def connect(init):
+    zed = sl.Camera()
+    status = zed.open(init)
+    if status != sl.ERROR_CODE.SUCCESS:
+        print(repr(status))
+        return None
+    else:
+        return zed
 
 
 def get_camera_intrinsics(camera):
