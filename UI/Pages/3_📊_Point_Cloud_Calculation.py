@@ -11,7 +11,7 @@ st.set_page_config(page_title="Point Cloud Calculation", page_icon=":smile:")
 st.title("Point Cloud Calculator")
 
 # Upload depth map
-depth_map = st.file_uploader("Upload Depth Map", type=['jpg', 'png'])
+depth_map = st.sidebar.file_uploader("Upload Depth Map", type=['jpg', 'png'])
 
 if depth_map is not None:
     depth_map = np.array(Image.open(depth_map))

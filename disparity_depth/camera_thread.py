@@ -86,9 +86,17 @@ def image_processing_thread(min_disp, num_disp,
                                                    speckleRange=speckleRange,
                                                    mode=mode)
 
+            # 中值滤波
+            disp_median = cv2.medianBlur(disp, 5)
+
+            # # 双边滤波
+            # disp_bilateral = cv2.bilateralFilter(disp_median, d=5, sigmaColor=75, sigmaSpace=75)
+
             # 可视化视差图
-            # disp_8U = cv2.normalize(disp, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-            disp_0_1 = np.clip((disp - min_disp) / num_disp, 0, 1)
+            disp_8U = cv2.normalize(disp, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            disp_median_8U = cv2.normalize(disp_median, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            # disp_bilateral_8U = cv2.normalize(disp_bilateral, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            # disp_0_1 = np.clip((disp - min_disp) / num_disp, 0, 1)
 
             # 计算深度、点云并可视化
             if disp is not None:
@@ -114,7 +122,10 @@ def image_processing_thread(min_disp, num_disp,
                 cv2.imshow("Left and Right", both_view)
                 # disp_and_depth = np.hstack([disp_0_1, depth])
                 # cv2.imshow("Disp and Depth", disp_and_depth)
-                cv2.imshow("Disparity", disp_0_1)
+                # cv2.imshow('Raw_disparity', disp_8U)
+                both_disparity = np.hstack([disp_8U, disp_median_8U])
+                cv2.imshow('Disparity', both_disparity)
+                # cv2.imshow("Disparity", disp_0_1)
                 cv2.imshow("Depth", depth)
 
             key = cv2.waitKey(10)

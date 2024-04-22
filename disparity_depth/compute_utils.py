@@ -30,7 +30,8 @@ def compute_disparity(left, right,
     )
 
     # 将整数的视差值转化为浮点数，便于更好的表示
-    disp = stereo.compute(left, right).astype(np.float32) / 16.0
+    # disp = stereo.compute(left, right).astype(np.float32) / 16.0
+    disp = stereo.compute(left, right).astype(np.float32)
     # 视差图归一化到 [0, 1]的范围内
     # disp = np.clip((disp - min_disp) / num_disp, 0, 1)
 
