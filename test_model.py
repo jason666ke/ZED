@@ -97,6 +97,7 @@ if __name__ == '__main__':
 	])
 	# o3d.visualization.draw_geometries([pcd])
 
+	o3d.io.write_point_cloud("./test_data/test_point_cloud.pcd", pcd, print_progress=True)
 	# pcd_points = np.asarray(pcd.points)
 	# pcd_colors = np.asarray(pcd.colors)
 	# # print(pcd_points[:5, :])
@@ -123,9 +124,9 @@ if __name__ == '__main__':
 	# # df.reset_index(drop=True, inplace=True)
 	#
 	# visualization
-	disp_vis = (disp - disp.min()) / (disp.max() - disp.min()) * 255.0
-	disp_vis = disp_vis.astype("uint8")
-	disp_vis = cv2.applyColorMap(disp_vis, cv2.COLORMAP_INFERNO)
+	# disp_vis = (disp - disp.min()) / (disp.max() - disp.min()) * 255.0
+	# disp_vis = disp_vis.astype("uint8")
+	# disp_vis = cv2.applyColorMap(disp_vis, cv2.COLORMAP_INFERNO)
 	#
 	# depth_vis = (depth - depth.min()) / (depth.max() - depth.min()) * 255.0
 	# depth_vis = depth_vis.astype("uint8")

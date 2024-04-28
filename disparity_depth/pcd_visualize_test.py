@@ -14,4 +14,4 @@ vis.add_geometry(pcd)
 
 while True:
     new_points = np.random.rand(10000, 3)
-    pcd_utils.update_point_cloud(pcd, vis , new_points)
+    pcd_utils.update_point_cloud(pcd, vis, new_points)

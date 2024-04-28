@@ -6,14 +6,20 @@ import numpy as np
 import open3d as o3d
 from nets import Model
 
-device = 'cuda'
-# model_path = "models/crestereo_eth3d.pth"
-# model_path = "../models/crestereo_eth3d.pth"
-model_path = "E:\grade_4\graduate\ZED\models\crestereo_eth3d.pth"
-model = Model(max_disp=256, mixed_precision=False, test_mode=True)
-model.load_state_dict(torch.load(model_path), strict=True)
-model.to(device)
-model.eval()
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+
+def load_model():
+    device = 'cuda'
+    # model_path = "models/crestereo_eth3d.pth"
+    # model_path = "../models/crestereo_eth3d.pth"
+    model_path = "E:\grade_4\graduate\ZED\models\crestereo_eth3d.pth"
+    model = Model(max_disp=256, mixed_precision=False, test_mode=True)
+    model.load_state_dict(torch.load(model_path), strict=True)
+    model.to(device)
+    model.eval()
+    return model
+
 
 def compute_disparity_SGBM(left, right,
                            min_disp, num_disp,
@@ -48,7 +54,7 @@ def compute_disparity_SGBM(left, right,
     return disp
 
 
-def inference(left, right, model, n_iter=20):
+def inference(left, right, model, n_iter=5):
     print("Model Forwarding...")
     imgL = left.transpose(2, 0, 1)
     imgR = right.transpose(2, 0, 1)
@@ -80,7 +86,7 @@ def inference(left, right, model, n_iter=20):
     return pred_disp
 
 
-def compute_disparity_CRE(left_img, right_img):
+def compute_disparity_CRE(left_img, right_img, model):
     # BGRA convert to BGR
     left_img = cv2.cvtColor(left_img, cv2.COLOR_BGRA2BGR)
     right_img = cv2.cvtColor(right_img, cv2.COLOR_BGRA2BGR)
@@ -180,6 +186,15 @@ def depth2pcd_with_o3d(left_img, depth_map, intrinsic):
         [0, 0, 0, 1]
     ])
     return pcd
+
+
+def updata_pcd(vis, old_pcd, new_pcd):
+    old_pcd.points = new_pcd.points
+    old_pcd.colors = new_pcd.colors
+
+    vis.update_geometry(old_pcd)
+    vis.poll_events()
+    vis.update_renderer()
 
 
 def visualize_pcd(point_cloud):

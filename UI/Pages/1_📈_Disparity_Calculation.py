@@ -9,6 +9,12 @@ from PIL import Image
 
 from disparity_depth import compute_utils
 
+
+@st.cache_resource
+def load_model():
+    return compute_utils.load_model()
+
+
 st.set_page_config(page_title="Disparity Calculation", page_icon="📈")
 
 st.title("Disparity Map Calculation")
@@ -36,12 +42,15 @@ st.sidebar.header("Adjust Parameters")
 min_disp = st.sidebar.slider("Minimum Disparity", min_value=0, max_value=16, value=0, key="min_disp")
 num_disp = st.sidebar.slider("Number of Disparities", min_value=16, max_value=256, value=16, step=16, key="num_disp")
 block_size = st.sidebar.slider("Block Size", min_value=3, max_value=13, value=3, step=2, key="block_size")
-P1 = st.sidebar.slider("P1", min_value=8 * 3 * block_size, max_value=16 * 3 * block_size, value=8 * 3 * block_size, key="P1")
-P2 = st.sidebar.slider("P2", min_value=32 * 3 * block_size, max_value=256 * 3 * block_size, value=32 * 3 * block_size, key="P2")
+P1 = st.sidebar.slider("P1", min_value=8 * 3 * block_size, max_value=16 * 3 * block_size, value=8 * 3 * block_size,
+                       key="P1")
+P2 = st.sidebar.slider("P2", min_value=32 * 3 * block_size, max_value=256 * 3 * block_size, value=32 * 3 * block_size,
+                       key="P2")
 disp12MaxDiff = st.sidebar.slider("disp12MaxDiff", min_value=-1, max_value=50, value=-1, key="disp12MaxDiff")
 preFilterCap = st.sidebar.slider("preFilterCap", min_value=1, max_value=63, value=30, key="preFilterCap")
 uniquenessRatio = st.sidebar.slider("Uniqueness Ratio", min_value=10, max_value=50, value=10, key="uniquenessRatio")
-speckleWindowSize = st.sidebar.slider("Speckle Window Size", min_value=0, max_value=20, value=0, key="speckleWindowSize")
+speckleWindowSize = st.sidebar.slider("Speckle Window Size", min_value=0, max_value=20, value=0,
+                                      key="speckleWindowSize")
 speckleRange = st.sidebar.slider("Speckle Range", min_value=0, max_value=20, value=0, key="speckleRange")
 
 # SGBM mode select
@@ -53,6 +62,7 @@ mode_functions = {
 mode_button = st.sidebar.radio("Select Mode", ("SGBM", "HH", "SGBM_3WAY"))
 select_mode = mode_functions.get(mode_button)
 
+model = load_model()
 # compute disparity after upload left and right image
 if left_img and right_img:
     left_img = Image.open(left_img)
@@ -67,7 +77,7 @@ if left_img and right_img:
                                                           P1, P2, disp12MaxDiff, preFilterCap,
                                                           uniquenessRatio, speckleWindowSize,
                                                           speckleRange, select_mode)
-    disparity_CRE = compute_utils.compute_disparity_CRE(left_img, right_img)
+    disparity_CRE = compute_utils.compute_disparity_CRE(left_img, right_img, model)
 
     if disparity_SGBM is not None:
         # Display disparity map
@@ -94,7 +104,3 @@ if left_img and right_img:
         st.error("Failed to compute disparity map.")
 else:
     st.info("Please upload left and right image before computing disparity.")
-
-
-
-

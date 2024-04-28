@@ -1,8 +1,20 @@
 import cv2
+import numpy as np
 import streamlit as st
 import pyzed.sl as sl
 from disparity_depth import camera_utils
 from disparity_depth import compute_utils
+import open3d as o3d
+
+
+@st.cache_resource
+def load_model():
+    st.header("Data analysis")
+    model = compute_utils.load_model()
+    st.success("Loaded model!")
+    st.write("Turning on evaluation mode...")
+    return model
+
 
 st.set_page_config(page_title="Real-time Estimation", page_icon="📹")
 
@@ -17,6 +29,9 @@ depth_mode_options = [sl.DEPTH_MODE.ULTRA, sl.DEPTH_MODE.NEURAL,
 
 selected_resolution = st.sidebar.selectbox("Resolution", resolution_options, format_func=lambda x: x.name)
 selected_depth_mode = st.sidebar.selectbox("Depth Mode", depth_mode_options, format_func=lambda x: x.name)
+
+model = load_model()
+
 connect_button = st.sidebar.button("Connect")
 stop_button = st.sidebar.button("Stop")
 
@@ -57,7 +72,7 @@ if connect_button:
         # camera information
         camera_info = zed.get_camera_information()
         input_type = camera_info.input_type
-        model = camera_info.camera_model
+        camera_model = camera_info.camera_model
         serial_number = camera_info.serial_number
         # camera config
         camera_config = camera_info.camera_configuration
@@ -76,7 +91,7 @@ if connect_button:
         with info_col:
             info_col.caption("Camera Information")
             info_col.write("Input type: {}".format(input_type))
-            info_col.write("Camera model: {}".format(model))
+            info_col.write("Camera model: {}".format(camera_model))
             info_col.write("Selected Resolution: {}".format(selected_resolution))
             info_col.write("Serial number: {}".format(serial_number))
         with config_col:
@@ -110,6 +125,15 @@ disp_container = st.empty()
 # depth container
 depth_container = st.empty()
 
+# point cloud visualization
+old_pcd = o3d.geometry.PointCloud()
+points = np.random.rand(10000, 3)
+old_pcd.points = o3d.utility.Vector3dVector(points)
+# visualizer
+vis = o3d.visualization.Visualizer()
+vis.create_window()
+vis.add_geometry(old_pcd)
+
 while connect_flag:
     if stop_button:
         connect_flag = False
@@ -128,24 +152,36 @@ while connect_flag:
             right_container.image(right_data, caption="Right Image", use_column_width=True)
 
         # compute disparity map
-        disp = compute_utils.compute_disparity_SGBM(left=left_data, right=right_data,
-                                                    min_disp=min_disp,
-                                                    num_disp=num_disp,
-                                                    block_size=block_size,
-                                                    P1=P1,
-                                                    P2=P2,
-                                                    disp12MaxDiff=disp12MaxDiff,
-                                                    preFilterCap=preFilterCap,
-                                                    uniquenessRatio=uniquenessRatio,
-                                                    speckleWindowSize=speckleWindowSize,
-                                                    speckleRange=speckleRange,
-                                                    mode=select_mode)
-
-        # Display disparity map
-        disparity_map_0_1 = cv2.normalize(disp, None, 0, 1, cv2.NORM_MINMAX)
-        disp_container.image(disparity_map_0_1, caption="Disparity Map", use_column_width=True)
+        # disp_SGBM = compute_utils.compute_disparity_SGBM(left=left_data, right=right_data,
+        #                                             min_disp=min_disp,
+        #                                             num_disp=num_disp,
+        #                                             block_size=block_size,
+        #                                             P1=P1,
+        #                                             P2=P2,
+        #                                             disp12MaxDiff=disp12MaxDiff,
+        #                                             preFilterCap=preFilterCap,
+        #                                             uniquenessRatio=uniquenessRatio,
+        #                                             speckleWindowSize=speckleWindowSize,
+        #                                             speckleRange=speckleRange,
+        #                                             mode=select_mode)
+        disp_CRE = compute_utils.compute_disparity_CRE(left_data, right_data, model)
 
         # compute depth map
-        depth_map = compute_utils.compute_depth(disp, baseline, fx)
-        # depth_map_0_1 = cv2.normalize(depth_map, None, 0, 1, cv2.NORM_MINMAX)
-        depth_container.image(depth_map, caption="Depth Map", use_column_width=True, clamp=True)
+        # depth_SGBM = compute_utils.compute_depth(disp_SGBM, baseline, fx)
+        depth_CRE = compute_utils.compute_depth(disp_CRE, baseline, fx)
+
+        # Display disparity map
+        disp_vis = compute_utils.img_visualize(disp_CRE)
+        depth_vis = compute_utils.img_visualize(depth_CRE)
+        with col1:
+            disp_container.image(disp_vis, caption="Disparity Map", use_column_width=True, clamp=True)
+        with col2:
+            depth_container.image(depth_vis, caption="Depth Map", use_column_width=True, clamp=True)
+
+        # compute point cloud
+        intrinsics = camera_utils.get_camera_intrinsics(zed)
+        new_pcd = compute_utils.depth2pcd_with_o3d(left_data, depth_CRE, intrinsics)
+        compute_utils.updata_pcd(vis, old_pcd, new_pcd)
+
+
+

@@ -4,6 +4,11 @@ import streamlit as st
 from PIL import Image
 from disparity_depth import compute_utils
 
+@st.cache_resource
+def load_model():
+    return compute_utils.load_model()
+
+
 st.set_page_config(page_title="Depth Calculation", page_icon="🌍")
 
 st.title("Depth Calculation")
@@ -52,6 +57,7 @@ baseline_mm = st.sidebar.number_input("Baseline (mm)", min_value=1, max_value=10
 focal_length_px = st.sidebar.number_input("Focal Length (pixels)", min_value=1, max_value=1000, value=260)
 compute_button = st.sidebar.button("Compute")
 
+model = load_model()
 # compute depth map
 if compute_button:
     if left_img and right_img:
@@ -67,7 +73,7 @@ if compute_button:
                                                               P1, P2, disp12MaxDiff, preFilterCap,
                                                               uniquenessRatio, speckleWindowSize,
                                                               speckleRange, select_mode)
-        disparity_CRE = compute_utils.compute_disparity_CRE(left_img, right_img)
+        disparity_CRE = compute_utils.compute_disparity_CRE(left_img, right_img, model)
 
         if disparity_SGBM is not None:
             depth_SGBM = compute_utils.compute_depth(disparity_SGBM, baseline_mm, focal_length_px)

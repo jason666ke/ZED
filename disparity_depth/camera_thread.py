@@ -55,7 +55,6 @@ def image_processing_thread(min_disp, num_disp,
     # 获取摄像头内参矩阵，焦距和基线距离
     camera_intrinsics, focal_left_x, baseline_mm = get_camera_intrinsics(zed)
     image_size = get_image_size(zed)
-    print("")
 
     # 点云对象和可视化窗口
     pcd = o3d.geometry.PointCloud()
@@ -66,6 +65,8 @@ def image_processing_thread(min_disp, num_disp,
     vis.create_window(height=image_size.height, width=image_size.width)
     vis.add_geometry(pcd)
 
+    model = compute_utils.load_model()
+
     while camera_status:
         if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
             # 获取左,右图像
@@ -75,63 +76,30 @@ def image_processing_thread(min_disp, num_disp,
             left_data = left.get_data()
             right_data = right.get_data()
 
-            # # 执行视差计算
-            # disp = compute_utils.compute_disparity_SGBM(left=left_data, right=right_data,
-            #                                             min_disp=min_disp, num_disp=num_disp,
-            #                                             block_size=block_size,
-            #                                             P1=P1, P2=P2,
-            #                                             disp12MaxDiff=disp12MaxDiff,
-            #                                             preFilterCap=preFilterCap,
-            #                                             uniquenessRatio=uniquenessRatio,
-            #                                             speckleWindowSize=speckleWindowSize,
-            #                                             speckleRange=speckleRange,
-            #                                             mode=mode)
-            disp = compute_utils.compute_disparity_CRE(left_data, right_data)
-
-            # 中值滤波
-            # disp_median = cv2.medianBlur(disp, 5)
-            # # 双边滤波
-            # disp_bilateral = cv2.bilateralFilter(disp_median, d=5, sigmaColor=75, sigmaSpace=75)
-
-            # 可视化视差图
-            disp_vis = (disp - disp.min()) / (disp.max() - disp.min()) * 255.0
-            disp_vis = disp_vis.astype("uint8")
-            disp_vis = cv2.applyColorMap(disp_vis, cv2.COLORMAP_INFERNO)
-            # disp_bilateral_8U = cv2.normalize(disp_bilateral, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-            # disp_0_1 = np.clip((disp - min_disp) / num_disp, 0, 1)
+            # compute disparity
+            disp = compute_utils.compute_disparity_CRE(left_data, right_data, model)
 
             # 计算深度、点云并可视化
             if disp is not None:
-                # print("Min and max disparity: ", np.min(disp), np.max(disp))
-
                 # 执行深度计算
                 depth = compute_utils.compute_depth(disp, baseline_mm, focal_left_x)
-                # print("Minimum and maximum depth is: ", np.min(depth), np.max(depth))
+                # Compute point cloud
+                new_point_cloud = compute_utils.depth2pcd_with_o3d(left_data, depth, camera_intrinsics)
+                compute_utils.updata_pcd(vis, pcd, new_point_cloud)
+                # pcd.points = new_point_cloud.points
+                # pcd.colors = new_point_cloud.colors
 
-                # 点云计算
-                # self implemented method
-                # new_pcd = compute_utils.depth2pcd(depth, camera_intrinsics)
-                # update_point_cloud(pcd, vis, new_pcd)
-                # open3D method todo: 点数据有问题
-                # new_pcd = compute_utils.depth2pcd_with_o3d(depth, camera_intrinsics)
-                # new_points = np.asarray(new_pcd.points)
-                # new_points = np.random.rand(10000, 3)
-                # get_pcd_info(new_pcd)
-                # update_point_cloud(pcd, vis, new_points)
+                # visualization
+                # disp_vis = compute_utils.img_visualize(disp)
+                # depth_vis = compute_utils.img_visualize(depth)
+                # both_view = np.hstack([left_data, right_data])
+                # cv2.imshow("Left and Right", both_view)
+                # cv2.imshow("Disparity and depth", np.hstack([disp_vis, depth_vis]))
+                # vis.update_geometry(pcd)
+                # vis.poll_events()
+                # vis.update_renderer()
 
-                # 可视化
-                both_view = np.hstack([left_data, right_data])
-                cv2.imshow("Left and Right", both_view)
-                cv2.imshow("Disparity", disp_vis)
-                # disp_and_depth = np.hstack([disp_0_1, depth])
-                # cv2.imshow("Disp and Depth", disp_and_depth)
-                # cv2.imshow('Raw_disparity', disp_8U)
-                # both_disparity = np.hstack([disp_8U, disp_median_8U])
-                # cv2.imshow('Disparity', both_disparity)
-                # cv2.imshow("Disparity", disp_0_1)
-                cv2.imshow("Depth", depth)
-
-            key = cv2.waitKey(10)
+            key = cv2.waitKey(1)
             if key == ord('q') or key == ord('Q'):
                 exit_program = True
                 print("Exit camera thread: ", exit_program)
