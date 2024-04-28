@@ -63,20 +63,35 @@ if compute_button:
         right_img = np.array(right_img)
 
         # compute disparity map
-        disparity_map = compute_utils.compute_disparity(left_img, right_img, min_disp, num_disp, block_size,
-                                                        P1, P2, disp12MaxDiff, preFilterCap,
-                                                        uniquenessRatio, speckleWindowSize,
-                                                        speckleRange, select_mode)
-        if disparity_map is not None:
-            depth_map = compute_utils.compute_depth(disparity_map, baseline_mm, focal_length_px)
+        disparity_SGBM = compute_utils.compute_disparity_SGBM(left_img, right_img, min_disp, num_disp, block_size,
+                                                              P1, P2, disp12MaxDiff, preFilterCap,
+                                                              uniquenessRatio, speckleWindowSize,
+                                                              speckleRange, select_mode)
+        disparity_CRE = compute_utils.compute_disparity_CRE(left_img, right_img)
+
+        if disparity_SGBM is not None:
+            depth_SGBM = compute_utils.compute_depth(disparity_SGBM, baseline_mm, focal_length_px)
             with col1:
                 # Display disparity map
-                disparity_map_0_1 = cv2.normalize(disparity_map, None, 0, 1, cv2.NORM_MINMAX)
-                st.image(disparity_map_0_1, caption="Disparity Map", use_column_width=True)
+                # disparity_map_0_1 = cv2.normalize(disparity_SGBM, None, 0, 1, cv2.NORM_MINMAX)
+                disp_vis_SGBM = compute_utils.img_visualize(disparity_SGBM)
+                st.image(disp_vis_SGBM, caption="Disparity From SGBM", use_column_width=True, clamp=True)
             with col2:
-                st.image(depth_map, caption="Depth Map", use_column_width=True, clamp=True)
+                depth_vis_SGBM = depth_SGBM
+                st.image(depth_vis_SGBM, caption="Depth From SGBM", use_column_width=True, clamp=True)
+
+        if disparity_CRE is not None:
+            depth_CRE = compute_utils.compute_depth(disparity_CRE, baseline_mm, focal_length_px)
+            with col1:
+                disp_vis_CRE = compute_utils.img_visualize(disparity_CRE)
+                st.image(disp_vis_CRE, caption="Disparity From CRE", use_column_width=True, clamp=True)
+            with col2:
+                depth_vis_CRE = compute_utils.img_visualize(depth_CRE)
+                st.image(depth_vis_CRE, caption="Depth From CRE", use_column_width=True, clamp=True)
+
+
 else:
-    st.error("Please upload left and right image before computing depth.")
+    st.info("Please upload left and right image before computing depth.")
 
 
 

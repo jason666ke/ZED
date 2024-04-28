@@ -46,16 +46,16 @@ if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
     right_data = right.get_data()
 
     # 执行视差计算
-    disp = compute_utils.compute_disparity(left=left_data, right=right_data,
-                                           min_disp=min_disp, num_disp=num_disp,
-                                           block_size=blockSize,
-                                           P1=P1, P2=P2,
-                                           disp12MaxDiff=disp12MaxDiff,
-                                           preFilterCap=preFilterCap,
-                                           uniquenessRatio=uniquenessRatio,
-                                           speckleWindowSize=speckleWindowSize,
-                                           speckleRange=speckleRange,
-                                           mode=mode)
+    disp = compute_utils.compute_disparity_SGBM(left=left_data, right=right_data,
+                                                min_disp=min_disp, num_disp=num_disp,
+                                                block_size=blockSize,
+                                                P1=P1, P2=P2,
+                                                disp12MaxDiff=disp12MaxDiff,
+                                                preFilterCap=preFilterCap,
+                                                uniquenessRatio=uniquenessRatio,
+                                                speckleWindowSize=speckleWindowSize,
+                                                speckleRange=speckleRange,
+                                                mode=mode)
 
     # 定义中值滤波的核大小和双边滤波的参数
     median_kernel_size = 5

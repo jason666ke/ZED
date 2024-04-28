@@ -55,6 +55,7 @@ def image_processing_thread(min_disp, num_disp,
     # 获取摄像头内参矩阵，焦距和基线距离
     camera_intrinsics, focal_left_x, baseline_mm = get_camera_intrinsics(zed)
     image_size = get_image_size(zed)
+    print("")
 
     # 点云对象和可视化窗口
     pcd = o3d.geometry.PointCloud()
@@ -74,27 +75,28 @@ def image_processing_thread(min_disp, num_disp,
             left_data = left.get_data()
             right_data = right.get_data()
 
-            # 执行视差计算
-            disp = compute_utils.compute_disparity(left=left_data, right=right_data,
-                                                   min_disp=min_disp, num_disp=num_disp,
-                                                   block_size=block_size,
-                                                   P1=P1, P2=P2,
-                                                   disp12MaxDiff=disp12MaxDiff,
-                                                   preFilterCap=preFilterCap,
-                                                   uniquenessRatio=uniquenessRatio,
-                                                   speckleWindowSize=speckleWindowSize,
-                                                   speckleRange=speckleRange,
-                                                   mode=mode)
+            # # 执行视差计算
+            # disp = compute_utils.compute_disparity_SGBM(left=left_data, right=right_data,
+            #                                             min_disp=min_disp, num_disp=num_disp,
+            #                                             block_size=block_size,
+            #                                             P1=P1, P2=P2,
+            #                                             disp12MaxDiff=disp12MaxDiff,
+            #                                             preFilterCap=preFilterCap,
+            #                                             uniquenessRatio=uniquenessRatio,
+            #                                             speckleWindowSize=speckleWindowSize,
+            #                                             speckleRange=speckleRange,
+            #                                             mode=mode)
+            disp = compute_utils.compute_disparity_CRE(left_data, right_data)
 
             # 中值滤波
-            disp_median = cv2.medianBlur(disp, 5)
-
+            # disp_median = cv2.medianBlur(disp, 5)
             # # 双边滤波
             # disp_bilateral = cv2.bilateralFilter(disp_median, d=5, sigmaColor=75, sigmaSpace=75)
 
             # 可视化视差图
-            disp_8U = cv2.normalize(disp, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-            disp_median_8U = cv2.normalize(disp_median, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            disp_vis = (disp - disp.min()) / (disp.max() - disp.min()) * 255.0
+            disp_vis = disp_vis.astype("uint8")
+            disp_vis = cv2.applyColorMap(disp_vis, cv2.COLORMAP_INFERNO)
             # disp_bilateral_8U = cv2.normalize(disp_bilateral, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
             # disp_0_1 = np.clip((disp - min_disp) / num_disp, 0, 1)
 
@@ -120,11 +122,12 @@ def image_processing_thread(min_disp, num_disp,
                 # 可视化
                 both_view = np.hstack([left_data, right_data])
                 cv2.imshow("Left and Right", both_view)
+                cv2.imshow("Disparity", disp_vis)
                 # disp_and_depth = np.hstack([disp_0_1, depth])
                 # cv2.imshow("Disp and Depth", disp_and_depth)
                 # cv2.imshow('Raw_disparity', disp_8U)
-                both_disparity = np.hstack([disp_8U, disp_median_8U])
-                cv2.imshow('Disparity', both_disparity)
+                # both_disparity = np.hstack([disp_8U, disp_median_8U])
+                # cv2.imshow('Disparity', both_disparity)
                 # cv2.imshow("Disparity", disp_0_1)
                 cv2.imshow("Depth", depth)
 

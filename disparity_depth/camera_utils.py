@@ -36,6 +36,12 @@ def get_camera_intrinsics(camera):
     cy = calibration_params.left_cam.cy
     camera_intrinsics = o3d.camera.PinholeCameraIntrinsic(width, height, fx, fy, cx, cy)
 
+    print("fx: {0} pixel".format(focal_left_x))
+    print("fy: {0} pixel".format(fy))
+    print("cx: {0} pixel".format(cx))
+    print("cy: {0} pixel".format(cy))
+    print("Image size: ({0} {1})".format(height, width))
+
     return camera_intrinsics, focal_left_x, baseline_mm
 
 

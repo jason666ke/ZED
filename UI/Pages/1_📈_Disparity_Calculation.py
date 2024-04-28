@@ -1,5 +1,6 @@
 import datetime
 import io
+import zipfile
 
 import cv2
 import numpy as np
@@ -62,34 +63,38 @@ if left_img and right_img:
     right_img = np.array(right_img)
 
     # compute disparity map
-    disparity_map = compute_utils.compute_disparity(left_img, right_img, min_disp, num_disp, block_size,
-                                                    P1, P2, disp12MaxDiff, preFilterCap,
-                                                    uniquenessRatio, speckleWindowSize,
-                                                    speckleRange, select_mode)
+    disparity_SGBM = compute_utils.compute_disparity_SGBM(left_img, right_img, min_disp, num_disp, block_size,
+                                                          P1, P2, disp12MaxDiff, preFilterCap,
+                                                          uniquenessRatio, speckleWindowSize,
+                                                          speckleRange, select_mode)
+    disparity_CRE = compute_utils.compute_disparity_CRE(left_img, right_img)
 
-    if disparity_map is not None:
+    if disparity_SGBM is not None:
         # Display disparity map
-        disparity_map_0_1 = cv2.normalize(disparity_map, None, 0, 1, cv2.NORM_MINMAX)
-        st.image(disparity_map_0_1, caption="Disparity Map", use_column_width=True)
-
-        # convert disparity map to image
-        disp_img = Image.fromarray(disparity_map.astype(np.uint8))
-
-        # button to save disparity
-        buffer = io.BytesIO()
-        disp_img.save(buffer, format='PNG')
-        buffer.seek(0)
-
-        # get file name
-        cur_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        file_name = "disparity_map" + cur_time + ".png"
-
-        disp_download_button = st.sidebar.download_button(label="Save Disparity Map", data=buffer,
-                                                          file_name=file_name, mime="image/png")
+        # disparity_map_0_1 = cv2.normalize(disparity_SGBM, None, 0, 1, cv2.NORM_MINMAX)
+        disp_vis_SGBM = compute_utils.img_visualize(disparity_SGBM)
+        disp_vis_CRE = compute_utils.img_visualize(disparity_CRE)
+        with col1:
+            st.image(disp_vis_SGBM, caption="SGBM", use_column_width=True, clamp=True)
+        with col2:
+            st.image(disp_vis_CRE, caption="CRE", use_column_width=True, clamp=True)
+        # st.image(disparity_map_0_1, caption="Disparity Map", use_column_width=True)
+        # download disparity
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED) as zipfile:
+            with zipfile.open("SGBM_disparity.png", 'w') as f:
+                f.write(cv2.imencode('.png', disp_vis_SGBM)[1].tobytes())
+            with zipfile.open("CRE_disparity.png", 'w') as f:
+                f.write(cv2.imencode('.png', disp_vis_CRE)[1].tobytes())
+        zip_buffer.seek(0)
+        st.download_button("Download Disparity Maps", zip_buffer.getvalue(),
+                           file_name="disparity_maps.zip",
+                           mime="application/zip")
     else:
         st.error("Failed to compute disparity map.")
 else:
-    st.error("Please upload left and right image before computing disparity.")
+    st.info("Please upload left and right image before computing disparity.")
+
 
 
 

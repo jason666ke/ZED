@@ -128,18 +128,18 @@ while connect_flag:
             right_container.image(right_data, caption="Right Image", use_column_width=True)
 
         # compute disparity map
-        disp = compute_utils.compute_disparity(left=left_data, right=right_data,
-                                               min_disp=min_disp,
-                                               num_disp=num_disp,
-                                               block_size=block_size,
-                                               P1=P1,
-                                               P2=P2,
-                                               disp12MaxDiff=disp12MaxDiff,
-                                               preFilterCap=preFilterCap,
-                                               uniquenessRatio=uniquenessRatio,
-                                               speckleWindowSize=speckleWindowSize,
-                                               speckleRange=speckleRange,
-                                               mode=select_mode)
+        disp = compute_utils.compute_disparity_SGBM(left=left_data, right=right_data,
+                                                    min_disp=min_disp,
+                                                    num_disp=num_disp,
+                                                    block_size=block_size,
+                                                    P1=P1,
+                                                    P2=P2,
+                                                    disp12MaxDiff=disp12MaxDiff,
+                                                    preFilterCap=preFilterCap,
+                                                    uniquenessRatio=uniquenessRatio,
+                                                    speckleWindowSize=speckleWindowSize,
+                                                    speckleRange=speckleRange,
+                                                    mode=select_mode)
 
         # Display disparity map
         disparity_map_0_1 = cv2.normalize(disp, None, 0, 1, cv2.NORM_MINMAX)
