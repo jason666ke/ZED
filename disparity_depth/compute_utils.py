@@ -47,9 +47,6 @@ def compute_disparity_SGBM(left, right,
 
     # openCV returns 16 * disparity in pixels
     disp = stereo.compute(left, right).astype(np.float32) / 16.0
-    # disp = stereo.compute(left, right).astype(np.float32)
-    # 视差图归一化到 [0, 1]的范围内
-    # disp = np.clip((disp - min_disp) / num_disp, 0, 1)
 
     return disp
 
@@ -95,8 +92,8 @@ def compute_disparity_CRE(left_img, right_img, model):
 
     # Resize image in case the GPU memory overflows
     eval_h, eval_w = (in_h, in_w)
-    assert eval_h % 8 == 0, "input height should be divisible by 8"
-    assert eval_w % 8 == 0, "input width should be divisible by 8"
+    # assert eval_h % 8 == 0, "input height should be divisible by 8"
+    # assert eval_w % 8 == 0, "input width should be divisible by 8"
 
     imgL = cv2.resize(left_img, (eval_w, eval_h), interpolation=cv2.INTER_LINEAR)
     imgR = cv2.resize(right_img, (eval_w, eval_h), interpolation=cv2.INTER_LINEAR)
@@ -113,16 +110,6 @@ def compute_disparity_CRE(left_img, right_img, model):
 
     t = float(in_w) / float(eval_w)
     disp = cv2.resize(pred, (in_w, in_h), interpolation=cv2.INTER_LINEAR) * t
-
-    # disp_vis = (disp - disp.min()) / (disp.max() - disp.min()) * 255.0
-    # disp_vis = disp_vis.astype("uint8")
-    # disp_vis = cv2.applyColorMap(disp_vis, cv2.COLORMAP_INFERNO)
-    #
-    # combined_img = np.hstack((left_img, disp_vis))
-    # cv2.namedWindow("output", cv2.WINDOW_NORMAL)
-    # cv2.imshow("output", combined_img)
-    # cv2.imwrite("output.jpg", disp_vis)
-    # cv2.waitKey(0)
 
     return disp
 

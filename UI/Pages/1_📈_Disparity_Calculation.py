@@ -19,9 +19,6 @@ st.set_page_config(page_title="Disparity Calculation", page_icon="📈")
 
 st.title("Disparity Map Calculation")
 
-# back_button = st.sidebar.button("Return to Home Page")
-# # if back_button:
-
 # upload left and right images
 st.sidebar.header("Upload Images")
 left_img = st.sidebar.file_uploader("Upload Left Image", type=['jpg', 'jpeg', 'png'])
