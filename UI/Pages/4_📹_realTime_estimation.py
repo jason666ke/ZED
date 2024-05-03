@@ -179,7 +179,7 @@ while connect_flag:
             depth_container.image(depth_vis, caption="Depth Map", use_column_width=True, clamp=True)
 
         # compute point cloud
-        intrinsics = camera_utils.get_camera_intrinsics(zed)
+        intrinsics, focal_left_x, baseline_mm = camera_utils.get_camera_intrinsics(zed)
         new_pcd = compute_utils.depth2pcd_with_o3d(left_data, depth_CRE, intrinsics)
         compute_utils.updata_pcd(vis, old_pcd, new_pcd)
 
